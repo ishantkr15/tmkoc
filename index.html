@@ -2,10 +2,15 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Jethalal's Gokuldham Dash</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Roboto:wght@400;700&display=swap');
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent; /* Remove blue tap highlight on Android */
+        }
 
         body {
             margin: 0;
@@ -15,12 +20,16 @@
             font-family: 'Roboto', sans-serif;
             touch-action: none; /* Prevent zoom/scroll on mobile */
             user-select: none;
+            -webkit-user-select: none;
+            position: fixed; /* Prevents elastic scrolling on iOS */
+            width: 100%;
+            height: 100%;
         }
 
         #game-container {
             position: relative;
-            width: 100vw;
-            height: 100vh;
+            width: 100%;
+            height: 100%;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -28,8 +37,10 @@
         }
 
         canvas {
+            display: block;
             box-shadow: 0 0 20px rgba(0,0,0,0.2);
             background: linear-gradient(to bottom, #87CEEB 0%, #E0F7FA 100%);
+            touch-action: none;
         }
 
         #ui-layer {
@@ -42,16 +53,19 @@
             display: flex;
             flex-direction: column;
             justify-content: space-between;
+            z-index: 5;
         }
 
         .hud {
             padding: 20px;
+            padding-top: max(20px, env(safe-area-inset-top)); /* Notch support */
             display: flex;
             justify-content: space-between;
             font-family: 'Fredoka One', cursive;
-            font-size: 24px;
+            font-size: 5vmin; /* Responsive font size */
             color: #fff;
             text-shadow: 2px 2px 0 #000;
+            width: 100%;
         }
 
         #start-screen, #game-over-screen {
@@ -68,29 +82,30 @@
             pointer-events: auto;
             z-index: 10;
             backdrop-filter: blur(5px);
+            padding: 20px;
         }
 
         h1 {
             font-family: 'Fredoka One', cursive;
-            font-size: 48px;
+            font-size: 10vmin; /* Responsive text */
             color: #FFD700;
-            text-shadow: 4px 4px 0 #d35400;
-            margin-bottom: 10px;
+            text-shadow: 0.5vmin 0.5vmin 0 #d35400;
+            margin-bottom: 2vh;
             text-align: center;
             line-height: 1.2;
         }
 
         p {
             color: white;
-            font-size: 18px;
+            font-size: 4vmin;
             text-align: center;
-            max-width: 80%;
-            margin-bottom: 30px;
+            max-width: 90%;
+            margin-bottom: 4vh;
         }
 
         .btn {
             padding: 15px 40px;
-            font-size: 24px;
+            font-size: 5vmin;
             font-family: 'Fredoka One', cursive;
             color: white;
             background: #FF5722;
@@ -101,6 +116,7 @@
             transition: transform 0.1s, box-shadow 0.1s;
             text-transform: uppercase;
             pointer-events: auto;
+            white-space: nowrap;
         }
 
         .btn:active {
@@ -112,10 +128,11 @@
             display: none !important;
         }
 
-        /* Mobile adjustments */
-        @media (max-width: 600px) {
-            h1 { font-size: 32px; }
-            .hud { font-size: 18px; padding: 10px; }
+        /* Specific Mobile tweaks */
+        @media (orientation: portrait) {
+            h1 { margin-bottom: 10px; }
+            .hud { font-size: 24px; }
+            .btn { padding: 20px 50px; font-size: 24px; }
         }
     </style>
 </head>
@@ -133,17 +150,17 @@
 
     <div id="start-screen">
         <h1>Gokuldham<br>Dash</h1>
-        <p>Help Jethalal reach Gada Electronics! <br>Jump over obstacles and collect Jalebi Fafda.</p>
+        <p>Help Jethalal reach Gada Electronics! <br>Tap to Jump & Collect Jalebi.</p>
         
-        <div style="margin-bottom: 15px; color: #fff; font-family: 'Fredoka One';">Instructions: Tap or Spacebar to Jump</div>
+        <div style="margin-bottom: 20px; color: #eee; font-family: 'Fredoka One'; font-size: 3.5vmin;">Tap screen or Press Space</div>
         
-        <button class="btn" id="start-btn">Chalo Shuru Karo!</button>
+        <button class="btn" id="start-btn">Start Game</button>
     </div>
 
     <div id="game-over-screen" class="hidden">
         <h1>Hey Maa<br>Mataji!</h1>
         <p id="death-reason">You hit an obstacle.</p>
-        <div style="font-size: 30px; color: #FFD700; font-family: 'Fredoka One'; margin-bottom: 20px;">
+        <div style="font-size: 6vmin; color: #FFD700; font-family: 'Fredoka One'; margin-bottom: 30px;">
             Score: <span id="final-score">0</span>
         </div>
         <button class="btn" id="restart-btn">Try Again</button>
@@ -171,6 +188,7 @@
     let score = 0;
     let jalebiCount = 0;
     let gameSpeed = 6;
+    let isMobile = false;
 
     // Assets
     const ASSETS = {
@@ -188,29 +206,22 @@
     
     // Image Handling
     const jethalalImg = new Image();
-    // Try to load standard filename
     jethalalImg.src = 'jethalal.png'; 
-    // Also try the uploaded filename just in case it's in the environment
-    jethalalImg.onerror = function() {
-        // Fallback logic handled in draw loop (useImage flag)
-        player.useImage = false;
-    };
-    jethalalImg.onload = function() {
-        player.useImage = true;
-    };
+    jethalalImg.onerror = function() { player.useImage = false; };
+    jethalalImg.onload = function() { player.useImage = true; };
 
     // Game Objects
     let player = {
         x: 50,
         y: 0,
-        width: 50, // Adjusted for image aspect
+        width: 50, 
         height: 70,
         dy: 0,
         jumpPower: -15,
         grounded: false,
         gravity: 0.8,
         groundY: 0,
-        useImage: false // Starts false, becomes true if image loads
+        useImage: false 
     };
 
     let obstacles = [];
@@ -222,7 +233,13 @@
     function resize() {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
-        player.groundY = canvas.height - 100;
+        
+        // Mobile adjustment: ground is higher up on small screens to leave space
+        const bottomMargin = canvas.width < 600 ? 150 : 100;
+        player.groundY = canvas.height - bottomMargin;
+
+        isMobile = canvas.width < 600;
+
         if (gameState === 'START') {
             player.y = player.groundY - player.height;
             draw();
@@ -248,17 +265,24 @@
         }
     });
 
-    window.addEventListener('touchstart', (e) => {
-        // e.preventDefault(); 
+    // Touch handling - prevent defaults to stop scrolling
+    function handleTouch(e) {
+        if (e.cancelable) e.preventDefault();
         if(gameState === 'PLAYING') jump();
-    }, {passive: false});
-    
-    window.addEventListener('mousedown', () => {
+    }
+
+    canvas.addEventListener('touchstart', handleTouch, {passive: false});
+    canvas.addEventListener('mousedown', (e) => {
         if(gameState === 'PLAYING') jump();
     });
 
     startBtn.addEventListener('click', startGame);
+    // Add touch listener to buttons specifically to ensure responsiveness
+    startBtn.addEventListener('touchstart', (e) => { e.stopPropagation(); startGame(); }, {passive: true});
+    
     restartBtn.addEventListener('click', startGame);
+    restartBtn.addEventListener('touchstart', (e) => { e.stopPropagation(); startGame(); }, {passive: true});
+
 
     // --- Game Logic ---
 
@@ -272,7 +296,10 @@
         score = 0;
         jalebiCount = 0;
         frames = 0;
-        gameSpeed = 6;
+        
+        // Adjust speed based on device width
+        // Slower on mobile because reaction distance is shorter
+        gameSpeed = isMobile ? 5 : 7; 
         
         // Initial clouds
         clouds = [];
@@ -367,10 +394,15 @@
         }
 
         // Spawning
-        if (frames % Math.floor(1000 / gameSpeed) === 0 || Math.random() < 0.01) {
-             // Don't spawn if too close to last obstacle
+        // Adjust spawn rate based on screen width to avoid impossible gaps
+        let spawnRate = Math.floor(1000 / gameSpeed);
+        if (isMobile) spawnRate = Math.floor(1200 / gameSpeed); // Less frequent on mobile
+
+        if (frames % spawnRate === 0 || Math.random() < 0.01) {
              const lastObstacle = obstacles[obstacles.length - 1];
-             if (!lastObstacle || (canvas.width - lastObstacle.x > 300)) {
+             // Ensure enough gap based on screen width
+             const minGap = isMobile ? 250 : 350;
+             if (!lastObstacle || (canvas.width - lastObstacle.x > minGap)) {
                  spawnObstacle();
              }
         }
@@ -384,7 +416,7 @@
             let obs = obstacles[i];
             obs.x -= gameSpeed;
 
-            // Hitbox reduction for fairer play
+            // Hitbox
             const hitX = obs.x + 5;
             const hitY = obs.y + 5;
             const hitW = obs.width - 10;
@@ -603,17 +635,11 @@
         
         if (player.useImage && jethalalImg.complete && jethalalImg.naturalWidth !== 0) {
             // Draw Image if loaded
-            // Draw image centered above the point
-            // Aspect ratio: preserve logic, usually images are taller.
-            const imgW = 60; // Fixed width for game
+            const imgW = 60; 
             const ratio = jethalalImg.naturalHeight / jethalalImg.naturalWidth;
             const imgH = imgW * ratio;
-            
-            // Adjust y so feet match ground
-            // The pivot point is (0,0) which corresponds to player feet in y-axis logic
             ctx.drawImage(jethalalImg, -imgW/2, -imgH, imgW, imgH);
         } else {
-            // Fallback to vector drawing
             drawJethalal(ctx);
         }
         
