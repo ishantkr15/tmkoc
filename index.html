@@ -174,7 +174,6 @@
 
     // Assets
     const ASSETS = {
-        // Note: Using drawing function instead of base64 to prevent code breakage
         player: { type: 'drawing' }, 
         ground: '#4CAF50',
         sky: '#87CEEB',
@@ -186,18 +185,32 @@
         ],
         collectible: { type: 'Jalebi', emoji: '🥨', score: 10 } 
     };
+    
+    // Image Handling
+    const jethalalImg = new Image();
+    // Try to load standard filename
+    jethalalImg.src = 'jethalal.png'; 
+    // Also try the uploaded filename just in case it's in the environment
+    jethalalImg.onerror = function() {
+        // Fallback logic handled in draw loop (useImage flag)
+        player.useImage = false;
+    };
+    jethalalImg.onload = function() {
+        player.useImage = true;
+    };
 
     // Game Objects
     let player = {
         x: 50,
         y: 0,
-        width: 40, // Adjusted for drawing
+        width: 50, // Adjusted for image aspect
         height: 70,
         dy: 0,
         jumpPower: -15,
         grounded: false,
         gravity: 0.8,
-        groundY: 0
+        groundY: 0,
+        useImage: false // Starts false, becomes true if image loads
     };
 
     let obstacles = [];
@@ -236,7 +249,7 @@
     });
 
     window.addEventListener('touchstart', (e) => {
-        // e.preventDefault(); // Optional: enable if scrolling is an issue
+        // e.preventDefault(); 
         if(gameState === 'PLAYING') jump();
     }, {passive: false});
     
@@ -250,7 +263,7 @@
     // --- Game Logic ---
 
     function initGame() {
-        resize(); // Ensure dimensions are correct
+        resize(); 
         player.y = player.groundY - player.height;
         player.dy = 0;
         obstacles = [];
@@ -436,35 +449,55 @@
 
     // --- Drawing Jethalal (Vector Style) ---
     function drawJethalal(ctx) {
-        // Relative coordinates assuming 0,0 is center-ish
-        const s = 1; // Scale factor if needed
-
-        // Body/Shirt (Colorful Orange)
-        ctx.fillStyle = '#FF9800'; 
+        // Body/Shirt (Vibrant Printed Shirt - Orange)
+        ctx.fillStyle = '#FF5722'; 
         ctx.fillRect(-18, -50, 36, 30);
         
-        // Shirt Patterns (Geometric prints)
-        ctx.fillStyle = '#D84315'; 
-        ctx.beginPath();
-        ctx.arc(-10, -40, 4, 0, Math.PI*2);
-        ctx.arc(8, -30, 4, 0, Math.PI*2);
-        ctx.arc(0, -45, 3, 0, Math.PI*2);
-        ctx.fill();
+        // Shirt Pattern (Geometric checks)
+        ctx.fillStyle = '#E64A19'; 
+        for(let i=-15; i<15; i+=6) {
+            for(let j=-48; j<-22; j+=6) {
+                if((i+j)%2===0) {
+                    ctx.beginPath();
+                    ctx.rect(i, j, 3, 3);
+                    ctx.fill();
+                }
+            }
+        }
 
         // Collar
-        ctx.fillStyle = '#BF360C';
+        ctx.fillStyle = '#D84315';
         ctx.beginPath();
         ctx.moveTo(-18, -50);
-        ctx.lineTo(0, -40);
+        ctx.lineTo(-18, -42); 
+        ctx.lineTo(0, -35);   
+        ctx.lineTo(18, -42);
         ctx.lineTo(18, -50);
-        ctx.lineTo(18, -45);
-        ctx.lineTo(-18, -45);
         ctx.fill();
 
-        // Pants (Grey/Black)
-        ctx.fillStyle = '#37474F';
-        ctx.fillRect(-16, -20, 14, 20); // Left leg
-        ctx.fillRect(2, -20, 14, 20);  // Right leg
+        // Arms 
+        ctx.fillStyle = '#FF5722';
+        ctx.fillRect(-22, -48, 4, 20);
+        ctx.fillRect(18, -48, 4, 20);
+        
+        // Hands
+        ctx.fillStyle = '#ffdbac'; 
+        ctx.beginPath();
+        ctx.arc(-20, -26, 3, 0, Math.PI*2);
+        ctx.arc(20, -26, 3, 0, Math.PI*2);
+        ctx.fill();
+
+        // Pants (Dark Grey)
+        ctx.fillStyle = '#263238'; 
+        ctx.fillRect(-16, -20, 14, 20); 
+        ctx.fillRect(2, -20, 14, 20); 
+
+        // Shoes
+        ctx.fillStyle = '#000';
+        ctx.beginPath();
+        ctx.ellipse(-9, 0, 6, 3, 0, 0, Math.PI*2);
+        ctx.ellipse(9, 0, 6, 3, 0, 0, Math.PI*2);
+        ctx.fill();
 
         // Head (Skin Tone)
         ctx.fillStyle = '#ffdbac'; 
@@ -472,29 +505,47 @@
         ctx.arc(0, -60, 16, 0, Math.PI * 2);
         ctx.fill();
 
-        // Hair (Side parting black)
+        // Hair (Side parting, swept back)
         ctx.fillStyle = '#000';
         ctx.beginPath();
-        ctx.moveTo(-16, -55);
-        ctx.quadraticCurveTo(-10, -80, 16, -60);
+        ctx.moveTo(-16, -60);
+        ctx.quadraticCurveTo(-12, -82, 16, -62); 
         ctx.lineTo(16, -55);
-        ctx.quadraticCurveTo(0, -65, -16, -55);
+        ctx.quadraticCurveTo(12, -52, 12, -50); 
+        ctx.lineTo(12, -55);
+        ctx.lineTo(-16, -55); 
+        ctx.quadraticCurveTo(-17, -58, -16, -60);
         ctx.fill();
 
-        // Mustache (Signature Jethalal)
-        ctx.lineWidth = 2.5;
-        ctx.strokeStyle = '#000';
+        // Mustache (Signature Thick)
+        ctx.lineWidth = 3.5;
+        ctx.strokeStyle = '#1a1a1a';
         ctx.lineCap = 'round';
         ctx.beginPath();
         ctx.moveTo(-7, -54);
         ctx.quadraticCurveTo(0, -58, 7, -54);
         ctx.stroke();
 
-        // Eyes
+        // Eyes (Excited!)
         ctx.fillStyle = '#000';
         ctx.beginPath();
-        ctx.arc(-5, -63, 2, 0, Math.PI*2);
-        ctx.arc(5, -63, 2, 0, Math.PI*2);
+        ctx.arc(-6, -65, 2.5, 0, Math.PI*2);
+        ctx.arc(6, -65, 2.5, 0, Math.PI*2);
+        ctx.fill();
+        
+        // Open Mouth Smile (Like the photo!)
+        ctx.fillStyle = '#fff'; // Teeth
+        ctx.beginPath();
+        ctx.arc(0, -48, 5, 0, Math.PI, false);
+        ctx.fill();
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        
+        // Tilak
+        ctx.fillStyle = '#D32F2F';
+        ctx.beginPath();
+        ctx.arc(0, -70, 1.5, 0, Math.PI*2);
         ctx.fill();
     }
 
@@ -542,7 +593,7 @@
         ctx.ellipse(player.x + player.width/2, Math.min(player.y + player.height + 5, player.groundY + 5), 20, 5, 0, 0, Math.PI*2);
         ctx.fill();
 
-        // Character
+        // Character Logic
         let bob = Math.sin(frames * 0.2) * 2;
         if(!player.grounded) bob = 0;
         
@@ -550,7 +601,21 @@
         ctx.translate(player.x + player.width/2, player.y + player.height + bob);
         if(player.grounded) ctx.rotate(Math.sin(frames * 0.2) * 0.1);
         
-        drawJethalal(ctx);
+        if (player.useImage && jethalalImg.complete && jethalalImg.naturalWidth !== 0) {
+            // Draw Image if loaded
+            // Draw image centered above the point
+            // Aspect ratio: preserve logic, usually images are taller.
+            const imgW = 60; // Fixed width for game
+            const ratio = jethalalImg.naturalHeight / jethalalImg.naturalWidth;
+            const imgH = imgW * ratio;
+            
+            // Adjust y so feet match ground
+            // The pivot point is (0,0) which corresponds to player feet in y-axis logic
+            ctx.drawImage(jethalalImg, -imgW/2, -imgH, imgW, imgH);
+        } else {
+            // Fallback to vector drawing
+            drawJethalal(ctx);
+        }
         
         ctx.restore();
 
@@ -566,7 +631,15 @@
             ctx.font = '40px Arial';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'bottom';
+            
+            // Add dark shadow for visibility
+            ctx.shadowColor = '#000';
+            ctx.shadowBlur = 5;
+            ctx.fillStyle = '#000';
+            
             ctx.fillText(obs.type.emoji, obs.x + obs.width/2, obs.y + obs.height);
+            
+            ctx.shadowBlur = 0; // Reset shadow
         });
 
         // Draw Collectibles
